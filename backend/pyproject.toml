@@ -1,0 +1,22 @@
+[project]
+name = "pm-backend"
+version = "0.1.0"
+description = "Project management MVP backend"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.162.0",
+    "itsdangerous>=2.2.0",
+    "openai>=3.43.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.2.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = "-m 'not live'"
+markers = ["live: calls the real OpenRouter API (needs OPENROUTER_API_KEY)"]
