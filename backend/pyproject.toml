@@ -20,3 +20,4 @@ dev = [
 pythonpath = ["."]
 addopts = "-m 'not live'"
 markers = ["live: calls the real OpenRouter API (needs OPENROUTER_API_KEY)"]
+filterwarnings = ["error::ResourceWarning", "error::pytest.PytestUnraisableExceptionWarning"]

@@ -11,10 +11,16 @@ export const testBoard = (): BoardData => ({
   },
 });
 
-export const mockBoardApi = (board: BoardData = testBoard()) => {
+export const mockBoardApi = (
+  board: BoardData = testBoard(),
+  save: () => Response | Promise<Response> = () => new Response("{}")
+) => {
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (url === "/api/board" && !init) {
       return new Response(JSON.stringify(board));
+    }
+    if (init?.method === "PUT") {
+      return save();
     }
     return new Response("{}");
   });

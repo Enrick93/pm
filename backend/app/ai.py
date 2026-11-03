@@ -42,7 +42,7 @@ class AIResponse(BaseModel):
 def client() -> OpenAI:
     return OpenAI(
         base_url="https://openrouter.ai/api/v1",
-        api_key=os.environ["OPENROUTER_API_KEY"],
+        api_key=os.environ.get("OPENROUTER_API_KEY"),
     )
 
 
@@ -61,7 +61,7 @@ def build_messages(board: Board, history: list[Message], message: str) -> list[d
     ]
 
 
-def chat(board: Board, history: list[Message], message: str) -> AIResponse:
+def chat(board: Board, history: list[Message], message: str) -> AIResponse | None:
     completion = client().chat.completions.parse(
         model=MODEL,
         messages=build_messages(board, history, message),

@@ -1,5 +1,7 @@
 import os
 import sqlite3
+from collections.abc import Iterator
+from contextlib import closing, contextmanager
 from pathlib import Path
 
 from app.models import Board
@@ -22,8 +24,10 @@ CREATE TABLE IF NOT EXISTS boards (
 """
 
 
-def connect() -> sqlite3.Connection:
-    return sqlite3.connect(DB_PATH)
+@contextmanager
+def connect() -> Iterator[sqlite3.Connection]:
+    with closing(sqlite3.connect(DB_PATH)) as conn, conn:
+        yield conn
 
 
 def init_db() -> None:

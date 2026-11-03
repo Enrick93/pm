@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import clsx from "clsx";
 import type { BoardData } from "@/lib/kanban";
-import { sendChat, type ChatMessage } from "@/lib/api";
+import { ApiError, sendChat, type ChatMessage } from "@/lib/api";
 
 type ChatSidebarProps = {
   onBoardUpdate: (board: BoardData) => void;
@@ -12,7 +12,7 @@ export const ChatSidebar = ({ onBoardUpdate }: ChatSidebarProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,7 +29,7 @@ export const ChatSidebar = ({ onBoardUpdate }: ChatSidebarProps) => {
     }
     setMessages([...messages, { role: "user", content: message }]);
     setInput("");
-    setError(false);
+    setError(null);
     setIsLoading(true);
     try {
       const result = await sendChat(message, messages);
@@ -37,8 +37,14 @@ export const ChatSidebar = ({ onBoardUpdate }: ChatSidebarProps) => {
       if (result.board) {
         onBoardUpdate(result.board);
       }
-    } catch {
-      setError(true);
+    } catch (err) {
+      setMessages(messages);
+      setInput(message);
+      setError(
+        err instanceof ApiError && err.status === 409
+          ? "The board changed while I was working. Please try again."
+          : "Something went wrong. Please try again."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -107,7 +113,7 @@ export const ChatSidebar = ({ onBoardUpdate }: ChatSidebarProps) => {
         )}
         {error && (
           <p className="text-sm text-[var(--secondary-purple)]">
-            Something went wrong. Please try again.
+            {error}
           </p>
         )}
       </div>

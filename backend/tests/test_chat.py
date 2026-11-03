@@ -1,3 +1,5 @@
+import openai
+
 from app import ai, db
 from app.ai import AIColumn, AIResponse, Message
 
@@ -83,3 +85,40 @@ def test_build_messages_includes_board_history_and_message(client):
     assert "Align roadmap themes" in messages[0]["content"]
     assert messages[1] == {"role": "assistant", "content": "Earlier reply"}
     assert messages[2] == {"role": "user", "content": "Question"}
+
+
+def test_ai_error_returns_502(auth_client, monkeypatch):
+    def failing_chat(board, history, message):
+        raise openai.OpenAIError("boom")
+
+    monkeypatch.setattr(ai, "chat", failing_chat)
+    assert auth_client.post("/api/chat", json={"message": "x"}).status_code == 502
+
+
+def test_missing_api_key_returns_502(auth_client, monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    assert auth_client.post("/api/chat", json={"message": "x"}).status_code == 502
+
+
+def test_no_parsed_response_returns_502(auth_client, monkeypatch):
+    monkeypatch.setattr(ai, "chat", fake_chat(None))
+    assert auth_client.post("/api/chat", json={"message": "x"}).status_code == 502
+
+
+def test_board_changed_during_chat_is_not_overwritten(auth_client, monkeypatch):
+    auth_client.get("/api/board")
+    columns = board_columns()
+    columns[0].cards.append(ai.Card(id="card-ai", title="From AI", details=""))
+
+    def chat_while_user_edits(board, history, message):
+        edited = auth_client.get("/api/board").json()
+        edited["cards"]["card-1"]["title"] = "User edit"
+        auth_client.put("/api/board", json=edited)
+        return AIResponse(reply="Done", columns=columns)
+
+    monkeypatch.setattr(ai, "chat", chat_while_user_edits)
+    assert auth_client.post("/api/chat", json={"message": "x"}).status_code == 409
+    saved = auth_client.get("/api/board").json()
+    assert saved["cards"]["card-1"]["title"] == "User edit"
+    assert "card-ai" not in saved["cards"]

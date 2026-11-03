@@ -1,7 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { KanbanBoard } from "@/components/KanbanBoard";
-import { lastSavedBoard, mockBoardApi } from "@/test/board";
+import { lastSavedBoard, mockBoardApi, testBoard } from "@/test/board";
 
 const renderBoard = async () => {
   render(<KanbanBoard onLogout={() => {}} />);
@@ -90,5 +90,52 @@ describe("KanbanBoard", () => {
     render(<KanbanBoard onLogout={onLogout} />);
     await userEvent.click(await screen.findByRole("button", { name: /log out/i }));
     expect(onLogout).toHaveBeenCalled();
+  });
+
+  it("returns to sign in when the session has expired", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 401 })));
+    const onLogout = vi.fn();
+    render(<KanbanBoard onLogout={onLogout} />);
+    await waitFor(() => expect(onLogout).toHaveBeenCalled());
+  });
+
+  it("shows an error when the board fails to load", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 500 })));
+    render(<KanbanBoard onLogout={() => {}} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not load/i);
+  });
+
+  it("shows an error when a save fails", async () => {
+    mockBoardApi(testBoard(), () => new Response("{}", { status: 500 }));
+    await renderBoard();
+    await userEvent.click(screen.getByRole("button", { name: "Delete First card" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not save/i);
+  });
+
+  it("returns to sign in when a save is unauthorized", async () => {
+    mockBoardApi(testBoard(), () => new Response("{}", { status: 401 }));
+    const onLogout = vi.fn();
+    render(<KanbanBoard onLogout={onLogout} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Delete First card" }));
+    await waitFor(() => expect(onLogout).toHaveBeenCalled());
+  });
+
+  it("sends saves one at a time", async () => {
+    let finishFirstSave = () => {};
+    const firstSave = new Promise<Response>((resolve) => {
+      finishFirstSave = () => resolve(new Response("{}"));
+    });
+    const saves = [() => firstSave, () => new Response("{}")];
+    const fetchMock = mockBoardApi(testBoard(), () => saves.shift()!());
+    const puts = () => fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT");
+    await renderBoard();
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete First card" }));
+    await userEvent.click(screen.getByRole("button", { name: "Delete Second card" }));
+    expect(puts()).toHaveLength(1);
+
+    finishFirstSave();
+    await waitFor(() => expect(puts()).toHaveLength(2));
+    expect(Object.keys(lastSavedBoard(fetchMock).cards)).toEqual([]);
   });
 });

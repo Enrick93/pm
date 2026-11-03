@@ -4,7 +4,7 @@ Project management MVP: a Kanban board with an AI assistant that can create, edi
 
 ## Run
 
-Put `OPENROUTER_API_KEY=...` in `.env` at the project root, then:
+Put `OPENROUTER_API_KEY=...` in `.env` at the project root (add `SESSION_SECRET=<random string>` if anyone else can reach the app; the default is a fixed dev secret), then:
 
 ```bash
 scripts/start.sh     # Windows: scripts/start.ps1

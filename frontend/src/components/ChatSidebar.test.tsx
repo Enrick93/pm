@@ -36,11 +36,20 @@ describe("ChatSidebar", () => {
     expect(onBoardUpdate).not.toHaveBeenCalled();
   });
 
-  it("shows an error when the request fails", async () => {
+  it("shows an error and restores the message when the request fails", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 502 })));
     render(<ChatSidebar onBoardUpdate={() => {}} />);
     await openAndSend("Hello");
     expect(await screen.findByText(/something went wrong/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Message")).toHaveValue("Hello");
+    expect(screen.queryByTestId("chat-user")).not.toBeInTheDocument();
+  });
+
+  it("explains when the board changed during the request", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 409 })));
+    render(<ChatSidebar onBoardUpdate={() => {}} />);
+    await openAndSend("Hello");
+    expect(await screen.findByText(/board changed/i)).toBeInTheDocument();
   });
 
   it("refreshes the board when the AI returns an update", async () => {

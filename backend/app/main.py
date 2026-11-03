@@ -2,6 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import openai
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError
@@ -11,7 +12,6 @@ from app import ai, db
 from app.models import Board
 
 STATIC_DIR = Path(os.environ.get("STATIC_DIR", Path(__file__).parent.parent / "static"))
-
 
 
 @asynccontextmanager
@@ -72,7 +72,6 @@ def me(username: str = Depends(current_user)):
     return {"username": username}
 
 
-
 def update_board(username: str, board: Board) -> Board:
     current = db.get_board(username)
     if [c.id for c in board.columns] != [c.id for c in current.columns]:
@@ -94,9 +93,16 @@ def write_board(board: Board, username: str = Depends(current_user)) -> Board:
 @app.post("/api/chat")
 def chat(request: ChatRequest, username: str = Depends(current_user)) -> ChatResponse:
     board = db.get_board(username)
-    result = ai.chat(board, request.history, request.message)
+    try:
+        result = ai.chat(board, request.history, request.message)
+    except openai.OpenAIError:
+        raise HTTPException(status_code=502, detail="The AI request failed")
+    if result is None:
+        raise HTTPException(status_code=502, detail="The AI returned no response")
     if result.columns is None:
         return ChatResponse(reply=result.reply, board=None)
+    if db.get_board(username) != board:
+        raise HTTPException(status_code=409, detail="The board changed during the request")
     try:
         new_board = update_board(username, ai.to_board(result.columns))
     except (ValidationError, HTTPException):
